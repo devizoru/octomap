@@ -3,15 +3,16 @@
 #ifdef __CUDA_SUPPORT__
 #include <cuda.h>
 #include <cuda_runtime.h>
+#include <nppi.h>
 #include <octomap/AssertionCuda.cuh>
 #include <octomap/OcTreeKey.h>
 
 namespace octomap {
 
-  class KeyContainerCuda {
+  class KeyArrayCuda {
   public:
     
-    CUDA_CALLABLE KeyContainerCuda (
+    CUDA_CALLABLE KeyArrayCuda (
       const int& maxSize = 100000) :
       maxSize(maxSize)
     {
@@ -19,11 +20,11 @@ namespace octomap {
       reset();
     }
 
-    CUDA_CALLABLE ~KeyContainerCuda () {
+    CUDA_CALLABLE ~KeyArrayCuda () {
       delete ray;
     }
     
-    CUDA_CALLABLE KeyContainerCuda(const KeyContainerCuda& other)
+    CUDA_CALLABLE KeyArrayCuda(const KeyArrayCuda& other)
     {
       ray = other.ray;
       last = other.last;
@@ -38,20 +39,19 @@ namespace octomap {
       cudaCheckErrors(cudaFree(ray));
     }
 
-    __host__ void copyToDevice(const KeyContainerCuda& other) {
+    __host__ void copyToDevice(const KeyArrayCuda& other) {
       assert (maxSize == other.sizeMax());
       cudaCheckErrors(cudaMemcpy(ray, other.ray, maxSize * sizeof(OcTreeKey), cudaMemcpyHostToDevice));
       last = other.last;
-      maxSize = other.maxSize;
     }
 
-    __host__ void copyToHost(const KeyContainerCuda& other) {
+    __host__ void copyToHost(const KeyArrayCuda& other) {
       assert (maxSize == other.sizeMax());
       cudaCheckErrors(cudaMemcpy(ray, other.ray, maxSize * sizeof(OcTreeKey), cudaMemcpyDeviceToHost));
       last = other.last;
     }
 
-    CUDA_CALLABLE KeyContainerCuda& operator=(const KeyContainerCuda& other){
+    CUDA_CALLABLE KeyArrayCuda& operator=(const KeyArrayCuda& other){
       ray = other.ray;
       last = other.last;
       maxSize = other.maxSize;
@@ -82,7 +82,69 @@ namespace octomap {
     int maxSize;
   };
 
-  using KeyRayCuda = KeyContainerCuda;
+  using KeyRayCuda = KeyArrayCuda;
+
+  struct KeyValue {
+    OcTreeKey key;
+    void* value;
+    KeyValue *next;
+  };
+
+  class KeyHashMapCuda {
+  public:
+    
+    CUDA_CALLABLE KeyHashMapCuda () :
+    {
+      size = NPP_MAX_32U;
+    }
+
+    CUDA_CALLABLE ~KeyHashMapCuda () {
+    }
+
+    __host__ void allocateDevice() {
+      table.count = entries;
+      HANDLE_ERROR( cudaMalloc( (void**)&table.entries,
+      entries * sizeof(Entry*)) );
+      HANDLE_ERROR( cudaMemset( table.entries, 0,
+      entries * sizeof(Entry*) ) );
+      HANDLE_ERROR( cudaMalloc( (void**)&table.pool,
+      elements * sizeof(Entry)) );
+      cudaCheckErrors(cudaMallocManaged(&arr, arr_size);
+    }
+
+    __host__ void freeDevice() {
+      cudaCheckErrors(cudaFree(arr));
+    }
+
+    __host__ void copyToDevice(const KeyHashMapCuda& other) {
+      assert (maxRowSize == other.sizeMax());
+      cudaCheckErrors(cudaMemcpy(arr, other.arr, arr_size * sizeof(int), cudaMemcpyHostToDevice));
+    }
+
+    __host__ void copyToHost(const KeyHashMapCuda& other) {
+      assert (maxRowSize == other.sizeMax());
+      cudaCheckErrors(cudaMemcpy(arr, other.arr, arr_size * sizeof(int), cudaMemcpyDeviceToHost));
+    }
+    
+    /*CUDA_CALLABLE void set(const int& val, const size_t& i, const size_t& j, const size_t& k) {
+      arr[i + j * maxRowSize + k * maxRowSize] = val;
+    }
+
+    CUDA_CALLABLE int get(const size_t& i, const size_t& j, const size_t& k) {
+      return arr[i][j][k];
+    }*/
+
+    //__device__ void setAtomic(const int& val, const size_t& i, const size_t& j, const size_t& k);
+
+    //CUDA_CALLABLE const size_t* begin() { return arr; }
+    //CUDA_CALLABLE const size_t* end() { return &arr[arr_size]; }
+    
+  private:
+    KeyValue* map;
+    KeyValue** entries;
+    size_t size;
+    bool host_alloc = {false};
+  };
 }
 #endif
 #endif

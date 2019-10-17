@@ -6,7 +6,7 @@
 #include <octomap/OccupancyOcTreeBase.h>
 #include <octomap/ColorOcTree.h>
 #include <octomap/OcTreeStamped.h>
-#include <octomap/KeyContainerCuda.cuh>
+#include <octomap/KeyArrayCuda.cuh>
 #include <thrust/host_vector.h>
 #include <thrust/device_vector.h>
 #include <algorithm>
